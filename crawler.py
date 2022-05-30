@@ -79,8 +79,25 @@ class GithubCrawler:
         :param username: github username.
         :return: None.
         """
-        if self._are_keywords_matched(self._get_repos(username)):
-            self._add_result(self._base_link + username)
+        for repo in self._get_repos(username):
+            if self._are_keywords_matched([repo]):
+                self._add_result(self._base_link + username + "/" + repo,
+                                 {"owner": username, "language_stats": self._get_lang_status(username, repo)})
+
+    def _get_lang_status(self, username: str, repo: str) -> dict:
+        """Get language status of repository.
+
+        :param username: github username.
+        :param repo: repository name.
+        :return: dictionary of lang info.
+        """
+        lang = {}
+        parsed = self._parsed_request(self._base_link + username + "/" + repo)
+        if parsed is not None:
+            cls = "d-inline-flex flex-items-center flex-nowrap Link--secondary no-underline text-small mr-3"
+            for a in parsed.find_all("a", class_=cls):
+                lang[a.find_all("span")[0].get_text()] = a.find_all("span")[1].get_text()
+        return lang
 
     def _check_wiki(self, username: str) -> None:
         """Starts the process of checking all user wikis for keywords.
@@ -115,7 +132,6 @@ class GithubCrawler:
         """
         try:
             username = self._num_to_user(user_num)
-            print(username)
             if self.type == "repositories":
                 self._check_repos(username)
             elif self.type == "wikis":
@@ -262,12 +278,15 @@ class GithubCrawler:
             return BeautifulSoup(resp.content, "html.parser")
         return None
 
-    def _add_result(self, el: str) -> None:
+    def _add_result(self, el: str, extra: dict = None) -> None:
         """Adding a page to results.
         :param el: link to be added.
         :return: None.
         """
-        self._results.append({"url": el})
+        if extra is None:
+            self._results.append({"url": el})
+        else:
+            self._results.append({"url": el, "extra": extra})
 
     def _are_keywords_matched(self, txt_list: List[str]) -> bool:
         """Checking strings for key strings.

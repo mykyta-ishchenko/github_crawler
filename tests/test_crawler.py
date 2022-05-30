@@ -76,7 +76,8 @@ class TestGithubCrawler(unittest.TestCase):
     def test_check_repos(self, mock_obj):
         mock_obj.return_value = ["html", "code"]
         self.gc._check_repos("1")
-        self.assertEqual(self.gc._results, [{"url": "https://github.com/1"}])
+        self.assertEqual(self.gc._results, [{'extra': {'language_stats': {}, 'owner': '1'},
+                                             'url': 'https://github.com/1/html'}])
 
     @patch("threading.Thread.start")
     @patch("threading.Thread.join")
@@ -107,6 +108,13 @@ class TestGithubCrawler(unittest.TestCase):
         self.gc.type = "other"
         self.assertIsNone(self.gc._search_by_user_num(0))
         self.assertRaises(TypeError, self.gc._search_by_user_num(""))
+
+    @patch("requests.get")
+    def test_get_lang_status(self, mock_get):
+        cls = "d-inline-flex flex-items-center flex-nowrap Link--secondary no-underline text-small mr-3"
+        mock_get.return_value = self._mock_response(
+            content=f"<a class='{cls}'><span>Python</span><span>101%</span></a>'")
+        self.assertEqual(self.gc._get_lang_status("", ""), {"Python": "101%"})
 
 
 if __name__ == "__main__":
