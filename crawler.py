@@ -13,7 +13,7 @@ class GithubCrawler:
     _wiki_link = "wiki/"
     _issues_link = "issues/"
     _repo_param = {"tab": "repositories"}
-    _username_valid_ascii = tuple(range(48, 58)) + tuple(range(97, 123)) + (45,)
+    _username_valid_ascii = tuple(range(97, 123)) + tuple(range(48, 58)) + (45,)
     _max_chr_num = 39
     _max_user_threads = 3
 
@@ -24,6 +24,8 @@ class GithubCrawler:
         self._results = []
 
     def crawl(self, needed: int = None) -> str:
+        if self.type not in ["wikis", "issues", "repositories"]:
+            return "Incorrect type"
         process = Thread(target=self._run_main_thread, args=(needed,))
         process.start()
         process.join()
@@ -48,33 +50,34 @@ class GithubCrawler:
         if self._are_keywords_matched(self._get_repos(username)):
             self._add_result(self._base_link + username)
 
-    def _check_wikis(self, username: str) -> None:
+    def _check_wiki(self, username: str) -> None:
         threads = []
         for repo in self._get_repos(username):
-            self._start_thread(_check_wikis_text_by_repo, (username, repo), threads)
+            self._start_thread(self._check_wiki_in_repo, (username, repo), threads)
         for el in threads:
             el.join()
 
     def _check_issues(self, username: str) -> None:
         threads = []
         for repo in self._get_repos(username):
-            self._start_thread(_check_issues_by_repo, (username, repo), threads)
+            self._start_thread(self._check_issues_in_repo, (username, repo), threads)
         for el in threads:
             el.join()
 
     def _search_by_user_num(self, user_num):
         try:
             username = self._num_to_user(user_num)
+            print(username)
             if self.type == "repositories":
                 self._check_repos(username)
             elif self.type == "wikis":
-                self._check_wikis(username)
+                self._check_wiki(username)
             elif self.type == "issues":
                 self._check_issues(username)
-            else:
-                return
         except requests.exceptions.ConnectTimeout as e:
             print("Problem with proxy", e)
+        except TypeError as e:
+            print("'user_num' must be positive int.")
 
     def _get_repos(self, username: str) -> List:
         repositories = []
@@ -95,7 +98,7 @@ class GithubCrawler:
     def _check_wiki_in_repo(self, username: str, repo: str):
         threads = []
         for wiki in self._get_wiki_list_in_repo(username, repo):
-            self._start_thread(_check_wiki_in_repo_by_name, (username, repo, wiki), threads)
+            self._start_thread(self._check_wiki_in_repo_by_name, (username, repo, wiki), threads)
         for el in threads:
             el.join()
 
@@ -124,15 +127,21 @@ class GithubCrawler:
         return issues_link
 
     def _check_issues_in_repo(self, username: str, repo: str):
+        thread = []
         for issue in self._get_issues_list_in_repo(username, repo):
-            self._check_issues_in_repo_by_name(issue)
+            self._start_thread(self._check_issues_in_repo_by_name, (issue,), thread)
+        for el in thread:
+            el.join()
 
     def _check_issues_in_repo_by_name(self, issue_link: str):
         link = self._base_link + issue_link
         parsed = self._parsed_request(link)
         if parsed is not None:
-            content = [parsed.find("span", class_="js-issue-title markdown-title").get_text()] + \
-                      [el.find("p").get_text() for el in parsed.find_all("td", class_="comment-body")]
+            title = parsed.find("span", class_="js-issue-title markdown-title")
+            content = [title.get_text() if title is not None else title] + \
+                      [el.find("p").get_text() for el in parsed.find_all("td", class_="comment-body") if
+                       el.find("p") is not None]
+            content = [el for el in content if el is not None]
             if self._are_keywords_matched(content):
                 self._add_result(link)
 
@@ -167,6 +176,3 @@ class GithubCrawler:
         cur = Thread(target=func, args=args, daemon=True)
         cur.start()
         temp.append(cur)
-
-    def __str__(self) -> str:
-        return f"Crawler(keywords: {self.keywords}, proxies: {self.proxies}, content_type: {self.content_type})"

@@ -37,8 +37,8 @@ class TestGithubCrawler(unittest.TestCase):
         self.assertEqual(res, "Test")
 
     def test_num_to_user(self):
-        self.assertEqual(self.gc._num_to_user(10), "a")
-        self.assertEqual(self.gc._num_to_user(1000), "r1")
+        self.assertEqual(self.gc._num_to_user(1), "b")
+        self.assertEqual(self.gc._num_to_user(100), "c0")
 
     @patch("requests.get")
     def test_check_issues_in_repo(self, mock_get):
@@ -94,7 +94,7 @@ class TestGithubCrawler(unittest.TestCase):
     @patch("crawler.GithubCrawler._start_thread")
     def test_check_wikis(self, mock_f1):
         mock_f1.shadow_effect = lambda: self.gc._add_result("1")
-        self.gc._check_wikis("")
+        self.gc._check_wiki("")
         self.assertTrue(len(self.gc._results) >= 0)
 
     @patch("crawler.GithubCrawler._start_thread")
